@@ -1,0 +1,11 @@
+name = "coreymark-ip"
+main = "src/worker.ts"
+compatibility_date = "2026-05-11"
+workers_dev = false
+
+[[routes]]
+pattern = "ip.coreymark.com"
+custom_domain = true
+
+[observability]
+enabled = true
