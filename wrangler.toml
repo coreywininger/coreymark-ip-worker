@@ -1,6 +1,7 @@
 name = "coreymark-ip"
 main = "src/worker.ts"
 compatibility_date = "2026-05-11"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = false
 
 [[routes]]
