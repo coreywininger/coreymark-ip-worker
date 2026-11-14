@@ -1,9 +1,10 @@
 import { EU_COUNTRY_CODES } from "./eu";
 import { ipToDecimal } from "./ip-decimal";
+import { renderHtml } from "./html";
 
 export interface Env {}
 
-interface IpData {
+export interface IpData {
   ip: string;
   ip_decimal: string;
   country: string;
@@ -137,67 +138,6 @@ function headersToObject(h: Headers): Record<string, string> {
   const out: Record<string, string> = {};
   h.forEach((v, k) => { out[k] = v; });
   return out;
-}
-
-function renderHtml(data: IpData): string {
-  const safe = (s: string) => s.replace(/[&<>"']/g, c => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!
-  ));
-  const lat = data.latitude;
-  const lon = data.longitude;
-  const coordsLine = (lat != null && lon != null)
-    ? `${lat.toFixed(4)}, ${lon.toFixed(4)} · <a href="https://www.openstreetmap.org/?mlat=${lat.toFixed(4)}&mlon=${lon.toFixed(4)}#map=11/${lat.toFixed(4)}/${lon.toFixed(4)}" target="_blank" rel="noopener">View on OpenStreetMap</a>`
-    : "—";
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ip.coreymark.com — what's my IP?</title>
-<meta name="robots" content="noindex">
-<style>
-  :root { color-scheme: light dark; }
-  body { font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; margin: 0; padding: 2rem 1.25rem; max-width: 720px; margin-inline: auto; }
-  h1 { font-size: 1.1rem; margin: 0 0 1rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; opacity: 0.7; }
-  .ip { font: 600 2.25rem/1.1 ui-monospace, "SF Mono", Menlo, monospace; margin: 0 0 1.5rem; word-break: break-all; }
-  dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1.25rem; margin: 0 0 1.5rem; }
-  dt { opacity: 0.6; font-size: 0.875rem; }
-  dd { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.875rem; word-break: break-word; }
-  dd.wrap { word-break: break-all; }
-  code { font: 0.875rem/1.45 ui-monospace, "SF Mono", Menlo, monospace; }
-  pre { background: color-mix(in srgb, currentColor 8%, transparent); padding: 0.75rem 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.8125rem; }
-  footer { margin-top: 2rem; font-size: 0.8125rem; opacity: 0.6; }
-  a { color: inherit; }
-</style>
-</head>
-<body>
-<h1>ip.coreymark.com</h1>
-<p class="ip">${safe(data.ip || "—")}</p>
-<dl>
-  <dt>IP (decimal)</dt><dd class="wrap">${safe(data.ip_decimal || "—")}</dd>
-  <dt>Country</dt><dd>${safe(data.country_name || "—")}</dd>
-  <dt>Country (ISO)</dt><dd>${safe(data.country || "—")}</dd>
-  <dt>In EU?</dt><dd>${data.is_eu ? "true" : "false"}</dd>
-  <dt>Region</dt><dd>${safe(data.region || "—")}</dd>
-  <dt>Region code</dt><dd>${safe(data.region_code || "—")}</dd>
-  <dt>Metro code</dt><dd>${data.metro_code != null ? data.metro_code : "—"}</dd>
-  <dt>City</dt><dd>${safe(data.city || "—")}</dd>
-  <dt>Postal</dt><dd>${safe(data.postal || "—")}</dd>
-  <dt>Coordinates</dt><dd>${coordsLine}</dd>
-  <dt>Timezone</dt><dd>${safe(data.time_zone || "—")}</dd>
-  <dt>ASN</dt><dd>${safe(data.asn)} ${data.asn_org ? `· ${safe(data.asn_org)}` : ""}</dd>
-  <dt>CF colo</dt><dd>${safe(data.colo || "—")}</dd>
-  <dt>User-Agent</dt><dd class="wrap">${safe(data.user_agent || "—")}</dd>
-</dl>
-<p><strong>Designed for terminals.</strong></p>
-<pre>$ curl ip.coreymark.com
-$ curl ip.coreymark.com/ip
-$ curl ip.coreymark.com/json
-$ curl ip.coreymark.com/country
-$ curl ip.coreymark.com/asn</pre>
-<footer>No request data is logged. <a href="https://github.com/coreywininger/coreymark-ip-worker">Source</a>.</footer>
-</body>
-</html>`;
 }
 
 export default {
