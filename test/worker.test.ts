@@ -23,6 +23,9 @@ describe("ip.coreymark.com worker — routing", () => {
       "time_zone", "asn", "asn_org", "continent", "colo", "user_agent",
     ];
     for (const k of expected) expect(body).toHaveProperty(k);
+    expect(Object.keys(body).sort()).toEqual([...expected].sort());
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
   });
 
   it("/ negotiates HTML for browsers", async () => {
@@ -77,6 +80,94 @@ describe("ip.coreymark.com worker — routing", () => {
     });
     const body = await res.json() as Record<string, string>;
     expect(body["x-test-marker"]).toBe("alpha");
+  });
+});
+
+describe("ip.coreymark.com worker — HTML view", () => {
+  // Documentation-range addresses only (RFC 5737 / RFC 3849).
+  const V4 = "203.0.113.42";
+  const V6 = "2001:db8:85a3:8d3:1319:8a2e:370:7348";
+  const browser = (ip: string) => ({
+    headers: { "Accept": "text/html", "User-Agent": "Mozilla/5.0 Chrome", "CF-Connecting-IP": ip },
+  });
+  const page = async (ip = V4) => {
+    const res = await SELF.fetch("https://ip.coreymark.com/", browser(ip));
+    return { res, body: await res.text() };
+  };
+  const stripTags = (s: string) => s.replace(/<[^>]+>/g, "");
+
+  it("keeps its response headers: no-store, CORS, HTML content type", async () => {
+    const { res } = await page();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("has the header, the IP panel, the usage panel and stays noindex", async () => {
+    const { body } = await page();
+    expect(body).toMatch(/<html lang="en">/);
+    expect(body).toMatch(/<meta name="robots" content="noindex">/);
+    for (const hook of ["data-ip-header", "data-brand", "data-ip-panel", "data-ip-fields", "data-ip-usage"]) {
+      expect(body).toContain(hook);
+    }
+    expect(body.match(/<h1[\s>]/g)).toHaveLength(1);
+  });
+
+  it("shows the caller's IP", async () => {
+    const { body } = await page();
+    const ip = body.match(/<p class="ip" data-ip>([\s\S]*?)<\/p>/);
+    expect(ip).not.toBeNull();
+    expect(stripTags(ip![1])).toBe(V4);
+  });
+
+  it("lets an IPv6 address wrap only after a colon, without changing its text", async () => {
+    const { body } = await page(V6);
+    const ip = body.match(/<p class="ip" data-ip>([\s\S]*?)<\/p>/)![1];
+    expect(stripTags(ip)).toBe(V6);
+    expect(ip.match(/<wbr>/g)).toHaveLength(7);
+    expect(ip).not.toMatch(/[0-9a-f]<wbr>/);
+  });
+
+  it("has one row per field, in a fixed order", async () => {
+    const { body } = await page();
+    const fields = [...body.matchAll(/class="row" data-field="([a-z_]+)"/g)].map((m) => m[1]);
+    expect(fields).toEqual([
+      "ip_decimal", "country_name", "country", "is_eu",
+      "region", "region_code", "metro_code", "city", "postal",
+      "coordinates", "time_zone", "asn", "colo", "user_agent",
+    ]);
+  });
+
+  it("links back to the tool on coreymark.com", async () => {
+    const { body } = await page();
+    const links = body.match(/<a href="https:\/\/coreymark\.com\/lab\/whatsmyip\/"[^>]*data-site-link/g);
+    expect(links?.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("is self-contained: no script, and nothing loaded from another host", async () => {
+    const { body } = await page();
+    expect(body).not.toMatch(/<script/i);
+    expect(body).not.toMatch(/<(link|img|iframe|source|video|audio|object|embed)\b/i);
+    expect(body).not.toMatch(/@import|url\(|\bsrc=/i);
+    expect(body).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("turns motion off for prefers-reduced-motion", async () => {
+    const { body } = await page();
+    const block = body.match(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/);
+    expect(block).not.toBeNull();
+    expect(block![0]).toMatch(/animation: none/);
+    expect(block![0]).toMatch(/transition: none/);
+  });
+
+  it("escapes the User-Agent", async () => {
+    const res = await SELF.fetch("https://ip.coreymark.com/", {
+      headers: { "Accept": "text/html", "User-Agent": 'Mozilla/5.0 <script>alert("x")</script>', "CF-Connecting-IP": V4 },
+    });
+    const body = await res.text();
+    expect(body).not.toMatch(/<script/i);
+    expect(body).toContain("&lt;script&gt;");
   });
 });
 
